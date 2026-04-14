@@ -85,6 +85,10 @@ def parse_decimal_input(value, default=None, field_name=None):
         raise ValueError(f"Valor inválido para {field_name or 'campo numérico'}: '{value}'")
 
 
+def limpar_string_para_arquivo(texto):
+    texto_limpo = re.sub(r'[^a-zA-Z0-9_.-]', '_', str(texto).strip())
+    texto_limpo = re.sub(r'_+', '_', texto_limpo)
+    return texto_limpo.strip('_')
 
 
 MAPEAMENTO_CT = {
