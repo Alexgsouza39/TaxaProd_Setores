@@ -14,6 +14,7 @@ import pandas as pd
 import re
 from decimal import Decimal, ROUND_HALF_UP
 import sys
+from pathlib import Path
 
 def resource_path(relative_path: str) -> Path:
     if getattr(sys, 'frozen', False):
@@ -71,10 +72,19 @@ def parse_time_to_decimal(time_str: str) -> float:
         return 0.0
 
 
-def limpar_string_para_arquivo(texto):
-    texto_limpo = re.sub(r'[^a-zA-Z0-9_.-]', '_', str(texto).strip())
-    texto_limpo = re.sub(r'_+', '_', texto_limpo)
-    return texto_limpo.strip('_')
+def parse_decimal_input(value, default=None, field_name=None):
+    s = str(value).strip()
+    if not s:
+        if default is not None:
+            return Decimal(str(default))
+        raise ValueError(f"Valor inválido para {field_name or 'campo numérico'}: '{value}'")
+    try:
+        s = s.replace(',', '.')
+        return Decimal(s)
+    except Exception:
+        raise ValueError(f"Valor inválido para {field_name or 'campo numérico'}: '{value}'")
+
+
 
 
 MAPEAMENTO_CT = {
@@ -373,18 +383,6 @@ class App(tk.Tk):
         for col in range(6):
             frame.columnconfigure(col, weight=1)
 
-        ttk.Label(frame, width=12, text="Artigo:").grid(row=0, column=0, sticky="w")
-        self.entry_acab_cod = ttk.Entry(frame, width=12)
-        self.entry_acab_cod.grid(row=0, column=1, sticky="ew", pady=6, padx=4)
-
-        ttk.Label(frame, width=8, text="Cor:").grid(row=0, column=2, sticky="w")
-        self.entry_acab_cod_cor = ttk.Entry(frame, width=10)
-        self.entry_acab_cod_cor.grid(row=0, column=3, sticky="ew", padx=4)
-
-        ttk.Label(frame, width=10, text="Descrição:").grid(row=0, column=4, sticky="w")
-        self.entry_acab_desc = ttk.Entry(frame, width=30)
-        self.entry_acab_desc.grid(row=0, column=5, sticky="ew", padx=4)
-
         ttk.Label(frame, text="PS(g/m²):").grid(row=1, column=0, sticky="w", pady=6)
         self.entry_acab_ps = ttk.Entry(frame, width=12)
         self.entry_acab_ps.grid(row=1, column=1, sticky="ew", padx=4)
@@ -426,7 +424,7 @@ class App(tk.Tk):
         self.entry_acab_conc3.grid(row=4, column=1, sticky="ew", padx=4)
 
     def _build_treeview_acabamento(self):
-        cols = ["PS", "PU", "Pick-up %", "Largura(m)", "Metragem(m)", "Banho(L)", "Arraste ml/m²", "Q1", "Conc.Q1(g/L)", "Cons.Q1(g/m)", "Q2", "Cons.Q2(g/L)", "Cons. Q2(g/m)", "Q3", "Cons.Q3(g/L)", "Cons.Q3(g/m)"]
+        cols = ["PS", "PU", "Pick-up %", "Largura(m)", "Metragem(m)", "Banho(L)", "Arraste ml/m²", "Q1", "Conc.Q1(g/L)", "Cons.Q1(g/m)", "Q2", "Conc.Q2(g/L)", "Cons.Q2(g/m)", "Q3", "Conc.Q3(g/L)", "Cons.Q3(g/m)"]
         frame = ttk.Frame(self.tab_acabamento)
         frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
         self.tab_acabamento.grid_rowconfigure(2, weight=1)
@@ -460,9 +458,8 @@ class App(tk.Tk):
         btn_clear.grid(row=0, column=1, padx=3)
 
     def limpar_acabamento(self):
-        for widget in [self.entry_acab_cod, self.entry_acab_cod_cor, self.entry_acab_desc, 
-                       self.entry_acab_ps, self.entry_acab_pu, self.entry_acab_larg, 
-                       self.entry_acab_vel, self.entry_acab_metragem,
+        for widget in [self.entry_acab_ps, self.entry_acab_pu, self.entry_acab_larg, 
+                       self.entry_acab_metragem,
                        self.entry_acab_quim1, self.entry_acab_conc1,
                        self.entry_acab_quim2, self.entry_acab_conc2,
                        self.entry_acab_quim3, self.entry_acab_conc3]:
@@ -472,45 +469,35 @@ class App(tk.Tk):
 
     def calcular_acabamento(self):
         try:
-            codigo = self.entry_acab_cod.get().strip()
-            cod_cor = self.entry_acab_cod_cor.get().strip()
-            descricao = self.entry_acab_desc.get().strip()
-            ps = float(self.entry_acab_ps.get())  # Peso seco (g/m²)
-            pu = float(self.entry_acab_pu.get())  # Peso úmido (g/m²)
-            largura = float(self.entry_acab_larg.get())  # Largura em m
-            metragem = float(self.entry_acab_metragem.get())  # Metragem em m
+            ps_dec = parse_decimal_input(self.entry_acab_ps.get(), field_name="PS(g/m²)")
+            pu_dec = parse_decimal_input(self.entry_acab_pu.get(), field_name="PU(g/m²)")
+            larg_dec = parse_decimal_input(self.entry_acab_larg.get(), field_name="Largura(m)")
+            metragem_dec = parse_decimal_input(self.entry_acab_metragem.get(), field_name="Metragem(m)")
             quim1 = self.entry_acab_quim1.get().strip()
-            conc1 = float(self.entry_acab_conc1.get() or 0)
+            conc1_dec = parse_decimal_input(self.entry_acab_conc1.get(), default=0, field_name="Conc.Q1(g/L)")
             quim2 = self.entry_acab_quim2.get().strip()
-            conc2 = float(self.entry_acab_conc2.get() or 0)
+            conc2_dec = parse_decimal_input(self.entry_acab_conc2.get(), default=0, field_name="Conc.Q2(g/L)")
             quim3 = self.entry_acab_quim3.get().strip()
-            conc3 = float(self.entry_acab_conc3.get() or 0)
-        except Exception:
-            messagebox.showerror("Erro", "Preencha corretamente todos os campos numéricos do Acabamento.")
+            conc3_dec = parse_decimal_input(self.entry_acab_conc3.get(), default=0, field_name="Conc.Q3(g/L)")
+        except Exception as exc:
+            messagebox.showerror("Erro", f"Preencha corretamente os campos numéricos do Acabamento.\n{exc}")
             return
 
         # Validações
-        if ps <= 0:
+        if ps_dec <= 0:
             messagebox.showerror("Erro", "g/m² Seco deve ser maior que zero.")
             return
-        if pu <= 0:
+        if pu_dec <= 0:
             messagebox.showerror("Erro", "g/m² Úmido deve ser maior que zero.")
             return
-        if largura <= 0:
+        if larg_dec <= 0:
             messagebox.showerror("Erro", "Largura deve ser maior que zero.")
             return
-        if metragem <= 0:
+        if metragem_dec <= 0:
             messagebox.showerror("Erro", "Metragem deve ser maior que zero.")
             return
 
         # Cálculos usando Decimal para precisão
-        ps_dec = Decimal(str(ps))
-        pu_dec = Decimal(str(pu))
-        larg_dec = Decimal(str(largura))
-        metragem_dec = Decimal(str(metragem))
-        conc1_dec = Decimal(str(conc1))
-        conc2_dec = Decimal(str(conc2))
-        conc3_dec = Decimal(str(conc3))
 
         # Pick-up (arraste) = (PU - PS) / PS * 100 (%)
         pickup_pct = ((pu_dec - ps_dec) / ps_dec) * Decimal('100')
@@ -520,38 +507,39 @@ class App(tk.Tk):
         area_m2 = metragem_dec * larg_dec
         volume_banho_l = (arraste_ml_m2 * area_m2) / Decimal('1000')
 
-        consumo1_g = volume_banho_l * conc1_dec
-        consumo2_g = volume_banho_l * conc2_dec
-        consumo3_g = volume_banho_l * conc3_dec
+        # Arraste calculado a partir de litros de banho por metro
+        banho_l_por_m = volume_banho_l / metragem_dec if metragem_dec > 0 else Decimal('0')
+        arraste_ml_m2 = (banho_l_por_m * Decimal('1000')) / larg_dec if larg_dec > 0 else Decimal('0')
 
-        consumo1_gpm = consumo1_g / metragem_dec if metragem_dec > 0 else Decimal('0')
-        consumo2_gpm = consumo2_g / metragem_dec if metragem_dec > 0 else Decimal('0')
-        consumo3_gpm = consumo3_g / metragem_dec if metragem_dec > 0 else Decimal('0')
+        consumo1_g = banho_l_por_m * conc1_dec
+        consumo2_g = banho_l_por_m * conc2_dec
+        consumo3_g = banho_l_por_m * conc3_dec
+
+        consumo1_gpm = (consumo1_g / metragem_dec) / Decimal('1000') if metragem_dec > 0 else Decimal('0')
+        consumo2_gpm = (consumo2_g / metragem_dec) / Decimal('1000') if metragem_dec > 0 else Decimal('0')
+        consumo3_gpm = (consumo3_g / metragem_dec) / Decimal('1000') if metragem_dec > 0 else Decimal('0')
 
         tabela = [{
-            "Artigo": codigo,
-            "Cor": cod_cor,
-            "Descrição": descricao,
             "PS": float(ps_dec),
             "PU": float(pu_dec),
-            "Pick-up %": round(float(pickup_pct), 2),
+            "Pick-up %": round(float(pickup_pct), 1),
             "Largura(m)": float(larg_dec),
             "Metragem(m)": float(metragem_dec),
-            "Total Banho(L)": round(float(volume_banho_l), 2),
-            "Arraste Total ml/m²": round(float(arraste_ml_m2), 2),
-            "Quim1": quim1,
-            "Conc.Quím1(g/L)": float(conc1_dec),
-            "Cons. Quím1(g/m)": round(float(consumo1_gpm), 4),
-            "Quim2": quim2,
-            "Conc. Quím2(g/L)": float(conc2_dec),
-            "Consumo Quím2(g/m)": round(float(consumo2_gpm), 4),
-            "Quim3": quim3,
-            "Conc.Quím3(g/L)": float(conc3_dec),
-            "Consumo Quím3(g/m)": round(float(consumo3_gpm), 4)
+            "Banho(L)": round(float(volume_banho_l), 1),
+            "Arraste ml/m²": round(float(arraste_ml_m2), 2),
+            "Q1": quim1,
+            "Conc.Q1(g/L)": float(conc1_dec),
+            "Cons.Q1(g/m)": round(float(consumo1_gpm), 4),
+            "Q2": quim2,
+            "Conc.Q2(g/L)": float(conc2_dec),
+            "Cons.Q2(g/m)": round(float(consumo2_gpm), 4),
+            "Q3": quim3,
+            "Conc.Q3(g/L)": float(conc3_dec),
+            "Cons.Q3(g/m)": round(float(consumo3_gpm), 4)
         }]
 
         # Preenche treeview
-        numeric_cols = {"PS", "PU", "Pick-up %", "Largura(m)", "Metragem(m)", "Total Banho(L)", "Arraste Total ml/m²", "Conc.Quím1(g/L)", "Cons.Quím1(g/m)", "Conc.Quím2(g/L)", "Cons.Quím2(g/m)", "Conc.Quím3(g/L)", "Cons.Quím3(g/m)"}
+        numeric_cols = {"PS", "PU", "Pick-up %", "Largura(m)", "Metragem(m)", "Banho(L)", "Arraste ml/m²", "Conc.Q1(g/L)", "Cons.Q1(g/m)", "Conc.Q2(g/L)", "Cons.Q2(g/m)", "Conc.Q3(g/L)", "Cons.Q3(g/m)"}
         for item in self.tree_acabamento.get_children():
             self.tree_acabamento.delete(item)
         for idx, row in enumerate(tabela):
@@ -561,7 +549,11 @@ class App(tk.Tk):
                 if c in numeric_cols:
                     try:
                         val_float = float(v)
-                        values.append(f"{val_float:.2f}")
+                        # Concentrações com 6 casas decimais
+                        if c in ["Conc.Q1(g/L)", "Conc.Q2(g/L)", "Conc.Q3(g/L)"]:
+                            values.append(f"{val_float}")
+                        else:
+                            values.append(f"{val_float}")
                     except Exception:
                         values.append(v)
                 else:
@@ -571,7 +563,6 @@ class App(tk.Tk):
 
         # Guarda para exportação
         self.last_df_acabamento = pd.DataFrame(tabela)
-        self.last_meta_acabamento = {"Código": codigo, "Cor": cod_cor, "Descrição": descricao}
 
         messagebox.showinfo("OK", "Cálculo de Acabamento concluído e tabela exibida.")
 
